@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Engenharia - Medicao e Contagem</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+  </head>
+  <body>
+    <!-- Hidden file input -->
+    <input id="pdfFile" type="file" accept="application/pdf" class="file-input-hidden" />
+
+    <header class="topbar">
+      <!-- Primary bar -->
+      <div class="topbar-primary">
+        <div class="app-brand">
+          <i data-lucide="ruler" class="brand-icon"></i>
+          <span class="brand-name">PDF Engenharia</span>
+        </div>
+
+        <div class="topbar-separator"></div>
+
+        <label for="pdfFile" class="file-btn" data-tooltip="Abrir PDF">
+          <i data-lucide="file-up"></i>
+          <span>Abrir PDF</span>
+        </label>
+
+        <div class="topbar-separator"></div>
+
+        <div class="group">
+          <button id="prevPage" disabled data-tooltip="Pagina anterior">
+            <i data-lucide="chevron-left"></i>
+          </button>
+          <span id="pageIndicator" class="indicator">0 / 0</span>
+          <button id="nextPage" disabled data-tooltip="Proxima pagina">
+            <i data-lucide="chevron-right"></i>
+          </button>
+        </div>
+
+        <div class="topbar-separator"></div>
+
+        <div class="group">
+          <button id="zoomOut" disabled data-tooltip="Diminuir zoom">
+            <i data-lucide="minus"></i>
+          </button>
+          <span id="zoomIndicator" class="indicator">100%</span>
+          <button id="zoomIn" disabled data-tooltip="Aumentar zoom">
+            <i data-lucide="plus"></i>
+          </button>
+        </div>
+
+        <div class="topbar-separator"></div>
+
+        <button id="magnetToggle" class="icon-toggle toggle-on" disabled data-tooltip="Ligar/desligar ima">
+          <i data-lucide="magnet"></i>
+          <span class="magnet-label">ON</span>
+        </button>
+
+        <div class="topbar-spacer"></div>
+      </div>
+
+      <!-- Secondary bar (scale settings, visible after PDF load) -->
+      <div id="topbarSecondary" class="topbar-secondary">
+        <span class="group-label">Escala</span>
+
+        <div class="group">
+          <span class="inline-label">Unidade</span>
+          <select id="unitSelect">
+            <option value="m" selected>m</option>
+            <option value="cm">cm</option>
+            <option value="mm">mm</option>
+            <option value="km">km</option>
+            <option value="in">in</option>
+            <option value="ft">ft</option>
+          </select>
+        </div>
+
+        <div class="group">
+          <span class="inline-label">Dist. real</span>
+          <input id="scaleValueInput" type="number" value="1" min="0.0001" step="0.01" />
+        </div>
+
+        <div class="group">
+          <span class="inline-label">Offset cota</span>
+          <input id="dimOffsetInput" type="number" value="18" min="4" max="80" step="1" />
+        </div>
+
+        <button id="resetScale" disabled data-tooltip="Resetar escala desta pagina">
+          <i data-lucide="refresh-cw"></i>
+          <span>Resetar escala</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="viewer-section">
+        <!-- Floating Toolbox -->
+        <div class="toolbox">
+          <div class="toolbox-group">
+            <button data-tool="none" class="tool active" disabled data-tooltip="Cursor">
+              <i data-lucide="mouse-pointer-2"></i>
+            </button>
+          </div>
+
+          <div class="toolbox-divider"></div>
+
+          <div class="toolbox-group">
+            <button data-tool="distance" class="tool" disabled data-tooltip="Distancia">
+              <i data-lucide="move-horizontal"></i>
+            </button>
+            <button data-tool="polygon" class="tool" disabled data-tooltip="Area / Perimetro">
+              <i data-lucide="pentagon"></i>
+            </button>
+          </div>
+
+          <div class="toolbox-divider"></div>
+
+          <div class="toolbox-group">
+            <button data-tool="count" class="tool" disabled data-tooltip="Contagem">
+              <i data-lucide="hash"></i>
+            </button>
+            <div class="toolbox-tag-input">
+              <input id="countTag" type="text" value="A" maxlength="20" title="Tag da contagem" />
+            </div>
+          </div>
+
+          <div class="toolbox-divider"></div>
+
+          <div class="toolbox-group">
+            <button data-tool="print-select" class="tool" disabled data-tooltip="Selecionar area">
+              <i data-lucide="scan"></i>
+            </button>
+          </div>
+
+          <div class="toolbox-divider"></div>
+
+          <div class="toolbox-group toolbox-actions">
+            <button id="finishPolygon" disabled data-tooltip="Fechar poligono">
+              <i data-lucide="check"></i>
+            </button>
+            <button id="cancelCurrent" disabled data-tooltip="Cancelar desenho">
+              <i data-lucide="x"></i>
+            </button>
+            <button id="clearPage" disabled data-tooltip="Limpar marcacoes">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Viewer Shell -->
+        <div id="viewerShell" class="viewer-shell">
+          <!-- Empty State -->
+          <div id="emptyState" class="empty-state">
+            <div class="empty-state-icon">
+              <i data-lucide="file-search"></i>
+            </div>
+            <h2 class="empty-state-title">Nenhum PDF carregado</h2>
+            <p class="empty-state-subtitle">Abra um arquivo PDF para comecar a medir e contar elementos no desenho.</p>
+            <label for="pdfFile" class="empty-state-btn">
+              <i data-lucide="upload"></i>
+              Selecionar arquivo PDF
+            </label>
+            <div class="empty-state-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <span>Carregue o PDF</span>
+              </div>
+              <div class="step-arrow"><i data-lucide="chevron-right"></i></div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <span>Calibre a escala</span>
+              </div>
+              <div class="step-arrow"><i data-lucide="chevron-right"></i></div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <span>Meca e conte</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PDF Viewer Container (hidden until PDF loads) -->
+          <div id="viewerContainer" class="viewer-container" style="display:none;">
+            <canvas id="pdfCanvas"></canvas>
+            <canvas id="overlayCanvas"></canvas>
+          </div>
+
+          <!-- Workflow Hint (shown after PDF load if not calibrated) -->
+          <div id="workflowHint" class="workflow-hint" style="display:none;">
+            <i data-lucide="info" class="hint-icon"></i>
+            <span>Use "Distancia" e marque 2 pontos para calibrar a escala usando o campo "Dist. real".</span>
+            <button class="hint-dismiss" id="dismissHint">&times;</button>
+          </div>
+        </div>
+
+        <div class="selection-actions" id="selectionActions">
+          <button id="printSelection" disabled>
+            <i data-lucide="printer"></i>
+            Imprimir area
+          </button>
+          <button id="saveSelection" disabled>
+            <i data-lucide="download"></i>
+            Salvar PNG
+          </button>
+        </div>
+      </section>
+
+      <aside class="sidepanel">
+        <div class="panel-card">
+          <h2>Status</h2>
+          <div id="statusText" class="status">Carregue um PDF para comecar.</div>
+          <div class="scale-status-row">
+            <span id="scaleStateBadge" class="scale-badge off">Nao calibrada</span>
+            <span id="magnetInfo" class="small muted">Ima: ON</span>
+          </div>
+          <div id="scaleInfo" class="small muted">Escala: nao calibrada</div>
+          <div id="calibrationInfo" class="small muted">Calibracao: nenhuma</div>
+        </div>
+
+        <div class="panel-card">
+          <h2>Resumo de contagem (pagina atual)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Qtde</th>
+                <th>Vis.</th>
+              </tr>
+            </thead>
+            <tbody id="summaryBody">
+              <tr>
+                <td colspan="3" class="muted">Sem dados.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="marksPanelCard" class="panel-card">
+          <div class="panel-card-head">
+            <h2>Marcacoes agrupadas (pagina atual)</h2>
+            <button id="toggleMarksPanel" class="panel-toggle" disabled>
+              <i data-lucide="chevron-up"></i>
+            </button>
+          </div>
+          <div id="marksPanelContent" class="marks-panel-content">
+            <div id="marksGrouped" class="mark-groups">
+              <div class="muted">Sem marcacoes.</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
